@@ -189,7 +189,26 @@ Header `Server: nginx` và các security header cho thấy request đã đi qua 
 
 ### Exercise 3.1: Railway deployment
 
-> Chờ đăng nhập Railway (`railway login`). URL sẽ được điền ở đây và trong `DEPLOYMENT.md`.
+- **URL:** https://day14-agent-production-e081d384.up.railway.app (deploy chính agent Part 6 trong `06-lab-complete/`, theo CP6)
+- **Nền tảng:** Railway, project `day14-agent` gồm service `day14-agent` (Dockerfile) và `Redis`. `REDIS_URL = ${{Redis.REDIS_URL}}` qua mạng nội bộ. `AGENT_API_KEY` đặt trong Variables của Railway. Chi tiết trong [DEPLOYMENT.md](DEPLOYMENT.md).
+- **Screenshot:** [screenshots/dashboard.png](screenshots/dashboard.png), [screenshots/running.png](screenshots/running.png), [screenshots/test.png](screenshots/test.png)
+
+4 lệnh tự kiểm tra của CP6 (2026-11-26 16:09 GMT+7):
+
+```text
+$ curl -sS -o /dev/null -w '%{http_code}\n' "$BASE/health"
+200
+$ curl -sS -o /dev/null -w '%{http_code}\n' "$BASE/ready"
+200
+$ curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$BASE/ask" -H 'Content-Type: application/json' -d '{"question":"Hello"}'
+401
+$ curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$BASE/ask" -H 'Content-Type: application/json' -H "X-API-Key: $AGENT_API_KEY" -d '{"question":"Hello"}'
+200
+```
+
+Ghi chú khi deploy:
+- Railway CLI báo `railway.toml` ("Config as Code") đã bị đánh dấu ngừng hỗ trợ, nhưng vẫn chạy tới **2026-12-01**. Mình giữ `railway.toml` vì đề và script chấm yêu cầu file này. Sau ngày đó cần chuyển sang `.railway/railway.ts` (`railway config migrate`).
+- Railway tự đọc log JSON của app thành các trường riêng (`event`, `path`, `status`, `ms`), xem `running.png`. Đây là lợi ích của structured logging trên cloud.
 
 ### Nền tảng còn lại: so sánh `railway.toml` với `render.yaml` (`06-lab-complete/`)
 
@@ -613,3 +632,4 @@ Một dòng log của app:
 | 7 | Chạy Part 2 và Part 5, ghi số đo | Script build image, chạy compose, gửi SIGTERM, tắt một instance | Tự tính % giảm kích thước từ số byte của `docker image inspect`. Đối chiếu `served_by` với log của từng container. |
 | 8 | Viết code Part 6 theo đúng các phép kiểm tra trong `check_production_ready.py` (đọc script, không sửa) | Code `config`, `auth`, `rate_limiter`, `cost_guard`, `redis_client`, `main`, Dockerfile, compose, `railway.toml`, `render.yaml` | Chạy script chấm bản đầy đủ: PASS 12/12. Thử tay bằng `docker compose` (422, 429, Redis chết). Tự phát hiện `/ready` mất 8 giây khi Redis chết, sửa xong còn 1,5 giây, chạy lại vẫn PASS. |
 | 9 | Chạy Part 7: load test, eval, sửa `KNOWLEDGE_BASE`, stack Prometheus/Grafana/Jaeger, thí nghiệm A–E | Script tự động, đọc `missing_keywords`, đo thời gian firing qua `/api/v1/alerts` và lịch sử series `ALERTS`. Chụp ảnh bằng Edge headless và Playwright | Kiểm tra không câu golden nào khác chứa keyword mới (0 regression). Phát hiện lần chạy Locust đầu có 100% lỗi do lỗi Dockerfile của đề, nên xoá kết quả đó và chạy lại. Mọi số trong `BENCHMARK_REPORT.md` lấy từ file JSON/CSV. |
+| 10 | Deploy agent Part 6 lên Railway (CP6) | Lệnh `railway init`, `add --database redis`, `add --service` kèm biến môi trường, `up`, `domain`. Key sinh ngẫu nhiên và lưu ở file `.env.deploy` (đã gitignore) | Mình tự đăng nhập Railway bằng mã kích hoạt. Chạy 4 lệnh CP6 được 200/200/401/200. `check_production_ready.py --public-url` báo ✅. Kiểm tra key không nằm trong file nào được commit. |
